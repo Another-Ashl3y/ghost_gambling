@@ -42,9 +42,12 @@ pub struct Player {
 }
 
 impl Player {
+    pub fn starting_money() -> f64 {
+        300.0
+    }
     pub fn new(rng: &mut ThreadRng) -> Self {
         Self {
-            money: 50.0,
+            money: Self::starting_money(),
             rebet: rng.gen(),
             pot: 0.0,
             believer: rng.gen(),
@@ -103,13 +106,14 @@ impl Manager {
             pool: Pool::new(1600000.0, 12000000.0),
         }
     }
-    pub fn step(&mut self, rng: &mut ThreadRng, log: bool) {
+    pub fn step(&mut self, rng: &mut ThreadRng, index: usize, log: bool) {
         let ghost: u8 = rng.gen_range(0..24);
         let believer_win = ghost == 0 || ghost == 1;
 
         //println!("Believer Win: {}", believer_win);
 
         for player in self.players.iter_mut() {
+            player.money += (50 & (index != 0 && index % 3 == 0) as i64) as f64;
             player.set_pot();
             if player.believer && believer_win {
                 player.cash_in(player.pot / self.pool.left, self.pool.right, log);
@@ -123,7 +127,7 @@ impl Manager {
     pub fn reset_player_money(&mut self) {
         self.players
             .iter_mut()
-            .for_each(|player| player.money = 50.0);
+            .for_each(|player| player.money = Player::starting_money());
     }
     pub fn get_best(&mut self) -> Player {
         self.sort_players();
@@ -136,7 +140,7 @@ impl Manager {
     }
     pub fn improve_step(&mut self, rng: &mut ThreadRng) {
         self.reset_player_money();
-        (0..100).for_each(|_| self.step(rng, false));
+        (0..100).for_each(|i| self.step(rng, i, false));
         self.sort_players();
         let mut players_copy = self.players.clone();
 
@@ -149,7 +153,7 @@ impl Manager {
             .for_each(|player| player.mutate(rng));
 
         self.reset_player_money();
-        (0..100).for_each(|_| self.step(rng, false));
+        (0..100).for_each(|i| self.step(rng, i, false));
         players_copy.sort_by(|a, b| a.money.partial_cmp(&b.money).unwrap());
         players_copy.reverse();
 
