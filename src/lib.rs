@@ -55,10 +55,12 @@ impl Player {
         self.pot = self.money * self.rebet;
         self.money -= self.pot;
     }
-    pub fn cash_in(&mut self, cut: f64, money: f64) {
+    pub fn cash_in(&mut self, cut: f64, money: f64, log: bool) {
         self.money += self.pot + cut * money;
-        let log = Log::new(self.pot, cut, money, self.money);
-        self.history.push(log);
+        if log {
+            let log = Log::new(self.pot, cut, money, self.money);
+            self.history.push(log);
+        }
         // println!("Rebet: {}\n{}", self.rebet, log); // Logging
     }
     pub fn log_loss(&mut self) {
@@ -101,7 +103,7 @@ impl Manager {
             pool: Pool::new(1600000.0, 12000000.0),
         }
     }
-    pub fn step(&mut self, rng: &mut ThreadRng) {
+    pub fn step(&mut self, rng: &mut ThreadRng, log: bool) {
         let ghost: u8 = rng.gen_range(0..24);
         let believer_win = ghost == 0 || ghost == 1;
 
@@ -110,11 +112,11 @@ impl Manager {
         for player in self.players.iter_mut() {
             player.set_pot();
             if player.believer && believer_win {
-                player.cash_in(player.pot / self.pool.left, self.pool.right);
+                player.cash_in(player.pot / self.pool.left, self.pool.right, log);
             } else if !believer_win && !player.believer {
-                player.cash_in(player.pot / self.pool.right, self.pool.left);
-            } else {
-                player.log_loss();
+                player.cash_in(player.pot / self.pool.right, self.pool.left, log);
+            } else if log {
+                player.log_loss()
             }
         }
     }
@@ -134,7 +136,7 @@ impl Manager {
     }
     pub fn improve_step(&mut self, rng: &mut ThreadRng) {
         self.reset_player_money();
-        (0..100).for_each(|_| self.step(rng));
+        (0..100).for_each(|_| self.step(rng, false));
         self.sort_players();
         let mut players_copy = self.players.clone();
 
@@ -147,11 +149,11 @@ impl Manager {
             .for_each(|player| player.mutate(rng));
 
         self.reset_player_money();
-        (0..100).for_each(|_| self.step(rng));
+        (0..100).for_each(|_| self.step(rng, false));
         players_copy.sort_by(|a, b| a.money.partial_cmp(&b.money).unwrap());
         players_copy.reverse();
 
-        println!("{} -> {}", players_copy[0].money, self.players[0].money);
+        //println!("{} -> {}", players_copy[0].money, self.players[0].money);
         if self.players[0].money < players_copy[0].money {
             self.players = players_copy;
         }
